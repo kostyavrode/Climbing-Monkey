@@ -1,0 +1,72 @@
+workflows:
+  unity-ios-build:
+    name: Unity iOS Build
+    instance_type: mac_mini_m1  # Используем Mac Mini M1 для сборки iOS
+    max_build_duration: 120
+    environment:
+      vars:
+        UNITY_VERSION: 2021.3.0f1
+        XCODE_WORKSPACE: "Unity-iPhone.xcworkspace"
+        XCODE_SCHEME: "Unity-iPhone"
+        APP_STORE_CONNECT_KEY_ID: $APP_STORE_KEY_ID
+        APP_STORE_CONNECT_ISSUER_ID: $APP_STORE_ISSUER_ID
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      node: latest
+      ruby: latest
+
+      groups:
+        - app_store_credentials  # Группа с секретными переменными
+
+    scripts:
+      - name: Checkout Repository
+        script: |
+          git clone $CM_REPO
+          cd $(basename "$CM_REPO" .git)
+
+      - name: Install Unity
+        script: |
+          curl -s https://get.unity3d.com/unitysetup.sh | bash
+          unity-editor --version $UNITY_VERSION
+
+      - name: Build Unity iOS Project
+        script: |
+          /Applications/Unity/Hub/Editor/$UNITY_VERSION/Unity.app/Contents/MacOS/Unity \
+          -batchmode -nographics -quit \
+          -projectPath $(pwd) \
+          -executeMethod BuildScript.BuildiOS
+
+      - name: Prepare Xcode Build
+        script: |
+          cd build/iOS
+          pod install
+          xcodebuild -workspace $XCODE_WORKSPACE \
+          -scheme $XCODE_SCHEME \
+          -sdk iphoneos \
+          -configuration Release \
+          -archivePath build.xcarchive archive
+
+      - name: Export iOS App
+        script: |
+          xcodebuild -exportArchive \
+          -archivePath build.xcarchive \
+          -exportOptionsPlist ExportOptions.plist \
+          -exportPath build/
+
+      - name: Upload to TestFlight
+        script: |
+          fastlane pilot upload --ipa build/Unity.ipa \
+          --api_key_path "$APP_STORE_CONNECT_API_KEY_PATH"
+
+    artifacts:
+      - build/Unity.ipa
+      - build/Unity.xcarchive
+
+    publishing:
+      app_store_connect:
+        auth: api_key
+        key_id: $APP_STORE_KEY_ID
+        issuer_id: $APP_STORE_ISSUER_ID
+        api_key: $APP_STORE_API_KEY
+        submit_to_testflight: true
