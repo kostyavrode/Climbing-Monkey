@@ -55,10 +55,7 @@ workflows:
       - build/Unity.ipa
       - build/Unity.xcarchive
 
-    publishing:
-      app_store_connect:
-        auth: integration
-        key_id: ${APP_STORE_KEY_ID}
-        issuer_id: ${APP_STORE_ISSUER_ID}
-        api_key: ${APP_STORE_API_KEY}
-        submit_to_testflight: true
+publishing:
+  app_store_connect:
+    auth: integration  # ✅ Используем интеграцию Codemagic
+    submit_to_testflight: true
